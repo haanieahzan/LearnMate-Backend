@@ -7,5 +7,6 @@ public record RecommendationResponse(
         String title,
         String description,
         UUID courseId,
-        UUID quizId
+        UUID quizId,
+        UUID resourceId
 ) {}

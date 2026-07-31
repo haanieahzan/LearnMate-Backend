@@ -54,7 +54,7 @@ public class SkillsAssessmentService {
                                 BigDecimal avg = average(group);
                                 String skillArea = sample.getQuiz().getSkillLabel() != null
                                         ? sample.getQuiz().getSkillLabel() : sample.getQuiz().getResource().getTitle();
-                                return new SkillAreaScore(skillArea, sample.getQuiz().getCourse().getCode(), avg, group.size());
+                                return new SkillAreaScore(skillArea, sample.getQuiz().getCourse().getCode(), avg, group.size(), sample.getQuiz().getResource().getId());
                             })
                             .sorted(Comparator.comparing(SkillAreaScore::skillArea))
                             .toList();

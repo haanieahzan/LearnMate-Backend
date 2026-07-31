@@ -20,7 +20,6 @@ public class FlashcardController {
     private final FlashcardService flashcardService;
 
     @PostMapping("/generate")
-    @PreAuthorize("hasRole('LECTURER')")
     public ResponseEntity<List<FlashcardResponse>> generate(@Valid @RequestBody GenerateFlashcardsRequest request) {
         return ResponseEntity.ok(flashcardService.generate(request));
     }

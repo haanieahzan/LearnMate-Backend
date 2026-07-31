@@ -37,7 +37,7 @@ public class RecommendationService {
                     "get_started",
                     "Take your first quiz",
                     "You haven't attempted any quizzes yet. Try one from the Quiz Center to get started and see your skill breakdown.",
-                    null, null
+                    null, null, null
             ));
             return recommendations;
         }
@@ -64,7 +64,8 @@ public class RecommendationService {
                         "Review: " + skillName,
                         "Your average score here is " + avg + "%. Retaking the quiz could help reinforce this material.",
                         quiz.getCourse().getId(),
-                        quiz.getId()
+                        quiz.getId(),
+                        quiz.getResource().getId()
                 ));
             }
         }
@@ -85,7 +86,8 @@ public class RecommendationService {
                     "Try: " + quiz.getTitle(),
                     "You haven't attempted this quiz yet — a good way to test your understanding of " + skillName + ".",
                     quiz.getCourse().getId(),
-                    quiz.getId()
+                    quiz.getId(),
+                    quiz.getResource().getId()
             ));
         }
 
