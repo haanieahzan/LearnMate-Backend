@@ -144,5 +144,25 @@ public class AiServiceClient {
             return "AI service quota exceeded. Please switch the AI provider.";
         }
     }
+    public Map<String, Object> generateFlashcards(UUID resourceId, int numCards, String provider, String ollamaModel) {
+        try {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("resource_id", resourceId.toString());
+            payload.put("num_cards", numCards);
+            payload.put("provider", provider);
+            payload.put("ollama_model", ollamaModel);
+            String json = objectMapper.writeValueAsString(payload);
+
+            return restClient.post()
+                    .uri("/generate-flashcards")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(json)
+                    .retrieve()
+                    .body(Map.class);
+        } catch (Exception e) {
+            log.error("Flashcard generation failed: {}", e.getMessage());
+            throw new RuntimeException("Flashcard generation failed", e);
+        }
+    }
 
 }
