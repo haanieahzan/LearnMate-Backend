@@ -47,6 +47,25 @@ public class User implements UserDetails {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    private String phone;
+
+    @Column(columnDefinition = "TEXT")
+    private String bio;
+
+    private String university;
+
+    @Column(name = "student_number")
+    private String studentNumber;
+
+    @Column(name = "degree_programme")
+    private String degreeProgramme;
+
+    @Column(name = "year_of_study")
+    private Integer yearOfStudy;
+
+    @Column(name = "expected_graduation")
+    private String expectedGraduation;
+
     @PrePersist
     public void prePersist() {
         if (createdAt == null) {
