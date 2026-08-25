@@ -71,12 +71,13 @@ public class AiServiceClient {
         }
     }
 
-    public Map<String, Object> generateQuiz(UUID resourceId, int numQuestions, String difficulty, String provider, String ollamaModel) {
+    public Map<String, Object> generateQuiz(UUID resourceId, int numQuestions, String difficulty, String questionFormat, String provider, String ollamaModel) {
         try {
             Map<String, Object> payload = new HashMap<>();
             payload.put("resource_id", resourceId.toString());
             payload.put("num_questions", numQuestions);
             payload.put("difficulty", difficulty);
+            payload.put("question_format", questionFormat);
             payload.put("provider", provider);
             payload.put("ollama_model", ollamaModel);
             String json = objectMapper.writeValueAsString(payload);

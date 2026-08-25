@@ -34,8 +34,10 @@ public class QuizService {
         int numQuestions = request.numQuestions() > 0 ? request.numQuestions() : 5;
         String difficulty = (request.difficulty() != null && !request.difficulty().isBlank())
                 ? request.difficulty() : "Medium";
+        String questionFormat = (request.questionFormat() != null && !request.questionFormat().isBlank())
+                ? request.questionFormat() : "MCQ";
         Map<String, Object> aiResult = aiServiceClient.generateQuiz(
-                resource.getId(), numQuestions, difficulty, request.provider(), request.ollamaModel()
+                resource.getId(), numQuestions, difficulty, questionFormat, request.provider(), request.ollamaModel()
         );
 
         List<Map<String, Object>> rawQuestions = (List<Map<String, Object>>) aiResult.get("questions");
@@ -48,9 +50,12 @@ public class QuizService {
         Quiz quiz = new Quiz();
         quiz.setCourse(resource.getCourse());
         quiz.setResource(resource);
-        quiz.setTitle("Quiz: " + resource.getTitle() + " (" + difficulty + ")");
+        quiz.setTitle("Quiz: " + resource.getTitle());
+        quiz.setDifficulty(difficulty);
+        quiz.setQuestionFormat(questionFormat);
         quiz.setSkillLabel(skillLabel != null && !skillLabel.isBlank() ? skillLabel : resource.getTitle());
         quiz.setGeneratedBy("AI");
+        quiz.setPublished(false);
         quizRepository.save(quiz);
 
         for (Map<String, Object> q : rawQuestions) {
@@ -72,8 +77,21 @@ public class QuizService {
         return toResponse(quiz);
     }
 
-    public List<QuizResponse> listByCourse(UUID courseId) {
-        return quizRepository.findByCourseId(courseId).stream().map(this::toResponse).toList();
+    public List<QuizResponse> listByCourse(UUID courseId, boolean includeUnpublished) {
+        return quizRepository.findByCourseId(courseId).stream()
+                .filter(q -> includeUnpublished || q.isPublished())
+                .map(this::toResponse)
+                .toList();
+    }
+
+    public List<QuizResponse> search(String topic, String format) {
+        return quizRepository.findAll().stream()
+                .filter(Quiz::isPublished)
+                .filter(q -> topic == null || topic.isBlank()
+                        || (q.getSkillLabel() != null && q.getSkillLabel().toLowerCase().contains(topic.toLowerCase())))
+                .filter(q -> format == null || format.isBlank() || format.equalsIgnoreCase(q.getQuestionFormat()))
+                .map(this::toResponse)
+                .toList();
     }
 
     public void deleteQuiz(UUID quizId) {
@@ -85,10 +103,12 @@ public class QuizService {
 
     private QuizResponse toResponse(Quiz quiz) {
         List<QuizQuestionResponse> questions = quizQuestionRepository.findByQuizId(quiz.getId())
-                .stream()
-                .map(this::toQuestionResponse)
-                .toList();
-        return new QuizResponse(quiz.getId(), quiz.getCourse().getId(), quiz.getTitle(), quiz.getCreatedAt(), questions);
+                .stream().map(this::toQuestionResponse).toList();
+        return new QuizResponse(
+                quiz.getId(), quiz.getCourse().getId(), quiz.getCourse().getCode(), quiz.getTitle(),
+                quiz.getSkillLabel(), quiz.getDifficulty(), quiz.getQuestionFormat(), quiz.isPublished(),
+                quiz.getCreatedAt(), questions
+        );
     }
 
     @SuppressWarnings("unchecked")
@@ -147,5 +167,63 @@ public class QuizService {
                         a.getId(), a.getQuiz().getId(), a.getScore(), 0, 0, a.getAttemptedAt(), List.of()
                 ))
                 .toList();
+    }
+
+    public List<QuizQuestionReviewResponse> getQuestionsForReview(UUID quizId, User lecturer) {
+        Quiz quiz = quizRepository.findById(quizId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Quiz not found"));
+        requireOwnership(quiz, lecturer);
+
+        return quizQuestionRepository.findByQuizId(quizId).stream()
+                .map(q -> {
+                    List<String> options = List.of();
+                    try {
+                        options = objectMapper.readValue(q.getOptions(), List.class);
+                    } catch (Exception ignored) { }
+                    return new QuizQuestionReviewResponse(q.getId(), q.getQuestionText(), q.getQuestionType(), options, q.getCorrectAnswer());
+                })
+                .toList();
+    }
+
+    public void updateQuestion(UUID questionId, UpdateQuestionRequest request, User lecturer) {
+        QuizQuestion question = quizQuestionRepository.findById(questionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Question not found"));
+        requireOwnership(question.getQuiz(), lecturer);
+
+        question.setQuestionText(request.questionText());
+        question.setCorrectAnswer(request.correctAnswer());
+        try {
+            question.setOptions(objectMapper.writeValueAsString(request.options() != null ? request.options() : List.of()));
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not save options");
+        }
+        quizQuestionRepository.save(question);
+    }
+
+    public void deleteQuestion(UUID questionId, User lecturer) {
+        QuizQuestion question = quizQuestionRepository.findById(questionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Question not found"));
+        requireOwnership(question.getQuiz(), lecturer);
+        quizQuestionRepository.delete(question);
+    }
+
+    public QuizResponse publish(UUID quizId, User lecturer) {
+        Quiz quiz = quizRepository.findById(quizId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Quiz not found"));
+        requireOwnership(quiz, lecturer);
+
+        if (quizQuestionRepository.findByQuizId(quizId).isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Cannot publish a quiz with no questions");
+        }
+
+        quiz.setPublished(true);
+        quizRepository.save(quiz);
+        return toResponse(quiz);
+    }
+
+    private void requireOwnership(Quiz quiz, User lecturer) {
+        if (!quiz.getCourse().getLecturer().getId().equals(lecturer.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only manage quizzes for your own courses");
+        }
     }
 }

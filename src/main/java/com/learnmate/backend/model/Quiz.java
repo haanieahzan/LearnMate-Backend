@@ -39,4 +39,13 @@ public class Quiz {
 
     @Column(name = "skill_label", length = 150)
     private String skillLabel;
+
+    @Column(length = 20)
+    private String difficulty;
+
+    @Column(name = "question_format", length = 20)
+    private String questionFormat;
+
+    @Column(nullable = false)
+    private boolean published = false;
 }

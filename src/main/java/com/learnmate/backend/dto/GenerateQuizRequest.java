@@ -8,6 +8,7 @@ public record GenerateQuizRequest(
         @NotNull UUID resourceId,
         int numQuestions,
         String difficulty,
+        String questionFormat,
         String provider,     // optional per-request override
         String ollamaModel   // optional per-request override
 ) {}
