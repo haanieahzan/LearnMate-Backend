@@ -1,5 +1,6 @@
 package com.learnmate.backend.controller;
 
+import com.learnmate.backend.dto.CourseProgressResponse;
 import com.learnmate.backend.dto.LecturerAnalyticsResponse;
 import com.learnmate.backend.dto.StudentAnalyticsResponse;
 import com.learnmate.backend.model.User;
@@ -8,8 +9,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/analytics")
@@ -26,6 +30,14 @@ public class AnalyticsController {
     @GetMapping("/lecturer")
     public ResponseEntity<LecturerAnalyticsResponse> lecturerAnalytics(@AuthenticationPrincipal User lecturer) {
         return ResponseEntity.ok(analyticsService.forLecturer(lecturer));
+    }
+
+    @GetMapping("/student/course/{courseId}")
+    public ResponseEntity<CourseProgressResponse> studentCourseAnalytics(
+            @PathVariable UUID courseId,
+            @AuthenticationPrincipal User student
+    ) {
+        return ResponseEntity.ok(analyticsService.forStudentCourse(student, courseId));
     }
 
 }

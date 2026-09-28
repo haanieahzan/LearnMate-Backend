@@ -69,6 +69,57 @@ public class AnalyticsService {
     }
 
     @Transactional(readOnly = true)
+    public CourseProgressResponse forStudentCourse(User student, UUID courseId) {
+        List<QuizAttempt> attempts = quizAttemptRepository.findByStudentId(student.getId()).stream()
+                .filter(a -> a.getQuiz().getCourse().getId().equals(courseId))
+                .toList();
+
+        if (attempts.isEmpty()) {
+            return new CourseProgressResponse(courseId, null, null, 0, BigDecimal.ZERO, List.of(), List.of());
+        }
+
+        var course = attempts.get(0).getQuiz().getCourse();
+
+        BigDecimal averageScore = average(attempts);
+
+        // Group by resource-derived skill area, same pattern as SkillsAssessmentService,
+        // but naturally scoped to just this one course's attempts.
+        Map<UUID, List<QuizAttempt>> byResource = attempts.stream()
+                .collect(Collectors.groupingBy(a -> a.getQuiz().getResource().getId()));
+
+        List<SkillAreaScore> skills = byResource.values().stream()
+                .map(group -> {
+                    QuizAttempt sample = group.stream()
+                            .filter(a -> a.getQuiz().getSkillLabel() != null && !a.getQuiz().getSkillLabel().isBlank())
+                            .findFirst()
+                            .orElse(group.get(0));
+                    String skillArea = sample.getQuiz().getSkillLabel() != null
+                            ? sample.getQuiz().getSkillLabel() : sample.getQuiz().getResource().getTitle();
+                    return new SkillAreaScore(skillArea, course.getCode(), average(group), group.size(), sample.getQuiz().getResource().getId());
+                })
+                .sorted(Comparator.comparing(SkillAreaScore::skillArea))
+                .toList();
+
+        List<RecentAttemptSummary> recent = attempts.stream()
+                .sorted(Comparator.comparing(QuizAttempt::getAttemptedAt).reversed())
+                .limit(5)
+                .map(a -> new RecentAttemptSummary(a.getQuiz().getTitle(), a.getScore(), a.getAttemptedAt()))
+                .toList();
+
+        return new CourseProgressResponse(
+                courseId, course.getCode(), course.getTitle(),
+                attempts.size(), averageScore, skills, recent
+        );
+    }
+    private BigDecimal average(List<QuizAttempt> attempts) {
+        return attempts.stream()
+                .map(QuizAttempt::getScore)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .divide(BigDecimal.valueOf(attempts.size()), 2, RoundingMode.HALF_UP);
+    }
+
+
+    @Transactional(readOnly = true)
     public LecturerAnalyticsResponse forLecturer(User lecturer) {
         List<Course> courses = courseRepository.findByLecturerId(lecturer.getId());
         Set<UUID> uniqueStudents = new HashSet<>();
@@ -96,7 +147,7 @@ public class AnalyticsService {
             Map<UUID, List<QuizAttempt>> byStudent = attempts.stream()
                     .collect(Collectors.groupingBy(a -> a.getStudent().getId()));
 
-            List<AtRiskStudent> atRisk = byStudent.values().stream()
+            List<AtRiskStudent> everyStudent = byStudent.values().stream()
                     .map(group -> {
                         BigDecimal avg = group.stream()
                                 .map(QuizAttempt::getScore)
@@ -105,13 +156,17 @@ public class AnalyticsService {
                         User student = group.get(0).getStudent();
                         return new AtRiskStudent(student.getFullName(), student.getEmail(), avg);
                     })
+                    .sorted(Comparator.comparing(AtRiskStudent::fullName))
+                    .toList();
+
+            List<AtRiskStudent> atRisk = everyStudent.stream()
                     .filter(s -> s.averageScore().compareTo(WEAK_SKILL_THRESHOLD) < 0)
                     .sorted(Comparator.comparing(AtRiskStudent::averageScore))
                     .toList();
 
             return new CourseAnalytics(
                     course.getId(), course.getCode(), course.getTitle(),
-                    quizzes.size(), attempts.size(), classAverage, atRisk
+                    quizzes.size(), attempts.size(), classAverage, atRisk, everyStudent
             );
         }).toList();
 

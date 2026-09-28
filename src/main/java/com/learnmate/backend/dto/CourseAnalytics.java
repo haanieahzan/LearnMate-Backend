@@ -1,5 +1,6 @@
 package com.learnmate.backend.dto;
 
+import java.util.List;
 import java.util.UUID;
 import java.math.BigDecimal;
 
@@ -10,5 +11,6 @@ public record CourseAnalytics(
         int quizCount,
         int totalAttempts,
         BigDecimal classAverage,
-        java.util.List<AtRiskStudent> atRiskStudents
+        List<AtRiskStudent> atRiskStudents,
+        List<AtRiskStudent> allStudents
 ) {}
